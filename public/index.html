@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to tb-gene-signature-pipeline’s documentation! &#8212; tb-gene-signature-pipeline 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="welcome-to-tb-gene-signature-pipeline-s-documentation">
+<h1>Welcome to tb-gene-signature-pipeline’s documentation!<a class="headerlink" href="#welcome-to-tb-gene-signature-pipeline-s-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<span class="target" id="module-tb_gene_signature_pipeline.network_analysis"></span><dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.compare_across_networks">
+<code class="sig-name descname"><span class="pre">compare_across_networks</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.compare_across_networks" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.construct_edge_weight_null_distribution">
+<code class="sig-name descname"><span class="pre">construct_edge_weight_null_distribution</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qval_thresh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">25</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.construct_edge_weight_null_distribution" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.construct_network">
+<code class="sig-name descname"><span class="pre">construct_network</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qval_thresh</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.construct_network" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.generate_gene_set_heatmaps">
+<code class="sig-name descname"><span class="pre">generate_gene_set_heatmaps</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.generate_gene_set_heatmaps" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results">
+<code class="sig-name descname"><span class="pre">merge_differential_expression_results</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">differential_expression_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pval_thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_fc_thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5849625007211562</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis">
+<code class="sig-name descname"><span class="pre">run_differential_expression_analysis</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run marginal, per-gene differential expression analyses.</p>
+<p><a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis" title="tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis"><code class="xref py py-func docutils literal notranslate"><span class="pre">run_differential_expression_analysis()</span></code></a> runs the differential analysis script
+<cite>gene-signature-pipeline-ml-pipeline/R/differential_expression_analysis.R</cite>.</p>
+<p>An independent case/control differential expression analysis is run for
+each dataset defined in <cite>data/datasets.json</cite>, and for each group comparison
+defined in <cite>data/comparisons.json</cite>.</p>
+<dl class="simple">
+<dt><code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></dt><dd><p>A dataframe with the schema</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.run_edge_weight_distribution_analysis">
+<code class="sig-name descname"><span class="pre">run_edge_weight_distribution_analysis</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qval_thresh</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.run_edge_weight_distribution_analysis" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.run_gene_enrichment_analysis">
+<code class="sig-name descname"><span class="pre">run_gene_enrichment_analysis</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.run_gene_enrichment_analysis" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">tb-gene-signature-pipeline</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Liam Abbott.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.5.4</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
