@@ -1,0 +1,13 @@
+{
+    "GPL6947": {"gene_col_name": "Gene.symbol"},
+    "GPL4133": {"gene_col_name": "Gene.symbol"},
+    "GPL10558": {"gene_col_name": "Gene.symbol"},
+    "GPL570": {"gene_col_name": "Gene.symbol"},
+    "GPL11532": {"gene_col_name": "Gene.symbol"},
+    "GPL6102": {"gene_col_name": "Gene.symbol"},
+    "GPL6480": {"gene_col_name": "Gene.symbol"},
+    "GPL6883": {"gene_col_name": "Gene.symbol"},
+    "GPL5175": {"gene_col_name": "gene_assignment"},
+    "GPL16951": {"gene_col_name": "Gene_symbol"},
+    "rnaseq": {"gene_col_name": "gene_symbol"}
+}

@@ -1,0 +1,18 @@
+[
+    {
+        "control": "hc",
+        "case": "atb"
+    },
+    {
+        "control": "hc",
+        "case": "ltbi"
+    },
+    {
+        "control": "od",
+        "case": "atb"
+    },
+    {
+        "control": "ltbi",
+        "case": "atb"
+    }
+]
