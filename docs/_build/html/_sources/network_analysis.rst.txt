@@ -1,5 +1,5 @@
-Network Analysis Module
-=======================
+Network Analysis
+================
 
 .. currentmodule:: tb_gene_signature_pipeline.network_analysis
 
