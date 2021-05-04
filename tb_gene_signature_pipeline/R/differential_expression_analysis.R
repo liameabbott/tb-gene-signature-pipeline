@@ -27,6 +27,7 @@ srr_gsm_id_map = read.table(
     column_to_rownames('srr_id')
 
 data_dir = config$data_directory
+rnaseq_dir = config$rnaseq_dataset_directory
 
 is_log_normalized = function(gset) {
 
@@ -232,7 +233,7 @@ differential_expression_analysis = function(dataset, comparisons, platforms, dat
         filename = paste(
             dataset$gse_id, 'salmon', 'genes', 'read_count',
             'tximport', 'tsv', sep='.')
-        filepath = file.path(data_dir, 'rnaseq-datasets', filename)
+        filepath = file.path(rnaseq_dir, filename)
         
         df_exprs = read.table(filepath, sep='\t', header=TRUE)
         df_exprs = inner_join(gene_id_symbol_map, df_exprs, by='gene_id') %>%

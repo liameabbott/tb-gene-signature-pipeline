@@ -1,3 +1,6 @@
 *__pycache__*
 *.ipynb_checkpoints*
 .git/
+notebooks/.*
+tb_gene_signature_pipeline/.*
+public/*

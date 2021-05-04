@@ -10,6 +10,6 @@ Welcome to tb-gene-signature-pipeline's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-.. automodule:: tb_gene_signature_pipeline.network_analysis
-   :members:
+   network_analysis
+   machine_learning_pipeline
 

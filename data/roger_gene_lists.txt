@@ -1,0 +1,57 @@
+Top Weighted Genes in ATB/HC & ATB/LTBI & ATB/OD networks
+
+    > UPREGULATED in ATB (N = 24)
+        > GBP5
+        > IFIT3 
+        > LAP3
+        > VAMP5 
+        > PSTPIP2 
+        > C1QB
+        > DUSP3 
+        > CEACAM1 
+        > WARS
+        > XAF1 
+        > SERPING1 
+        > GBP4
+        > BATF2
+        > ANKRD22 
+        > TLR5
+        > SMARCD3 
+        > ADM
+        > AIM2
+        > FCGR1B
+        > FAM26F
+        > EPSTI1
+        > GBP1
+        > IFITM3 
+        > ANXA3
+        
+Top Weighted Genes in ATB/HC & ATB/LTBI networks but not ATB/OD network
+
+    > UPREGULATED in ATB (N = 12)
+        > TNFSF10
+        > DYSF
+        > IL1B 
+        > GK
+        > LHFPL2 
+        > TRIM22 
+        > CLEC4D 
+        > TNFSF13B 
+        > PLAUR
+        > LY96
+        > FBXO6 
+        > KCNJ15 
+    
+    > DOWNREGULATED in ATB (N = 11)
+        > SPOCK2
+        > TMEM204
+        > IL7R
+        > GPR183
+        > ID3
+        > CD6
+        > KLRB1
+        > PIK3IP1
+        > CCR7
+        > NELL2
+        > SKAP1
+        
