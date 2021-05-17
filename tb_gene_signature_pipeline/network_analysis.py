@@ -1,20 +1,99 @@
 
 import yaml
+import pickle
 import numpy as np
 import pandas as pd
 import networkx as nx
 from pathlib import Path
-from subprocess import check_output
+from collections import Counter
+from subprocess import check_call
 
 with (Path.cwd().resolve().parent / 'config.yml').open('r') as f:
     config = yaml.safe_load(f)
 
 this_dir = Path(__file__).parent.absolute()
+
 data_dir = Path(config['data_directory'])
 data_dir.mkdir(parents=True, exist_ok=True)
 
+def _edge_weight_computer(m):
+    w = m @ m.T
+    a = w[np.triu_indices(m.shape[0], k=1)]
+    c = Counter(a)
+    
+    df = (pd
+        .DataFrame
+        .from_dict(c, orient='index')
+        .rename({0: 'count'}, axis=1))
+    df.index.name = 'edge_weight'
+    
+    return df
+
+def _permute_columns(m):
+    idx_i = np.random.sample(m.shape).argsort(axis=0)
+    idx_j = np.tile(np.arange(m.shape[1]), (m.shape[0], 1))
+    
+    return m[idx_i, idx_j]
+
+def compute_edge_weight_distributions(merged_results, overwrite=False):
+    """
+    """
+    edge_weights_file = data_dir / 'edge_weights.tsv'
+    
+    if any([not edge_weights_file.exists(), overwrite]):
+        df_ = merged_results.copy()
+        df_ = df_.set_index(['control', 'case', 'gene_symbol'])
+
+        df_[df_ < 0] = -1
+        df_[df_ == 0] = 0
+        df_[df_ > 0] = 1
+        df_ = df_.astype(int)
+
+        df_ = (df_
+            .groupby(level=['control', 'case'])
+            .apply(lambda x: _edge_weight_computer(x.values))
+            .reset_index())
+        
+        df_.to_csv(edge_weights_file, sep='\t', index=False)
+        
+    df_ = pd.read_table(edge_weights_file, sep='\t')
+    
+    return df_
+
+def generate_null_edge_weight_distributions(merged_results, n_iter=1, overwrite=False):
+    """
+    """
+    null_distribution_file = data_dir / 'edge_weight_null_distributions.tsv'
+    
+    if any([not null_distribution_file.exists(), overwrite]):
+        df_ = merged_results.copy()
+        df_ = df_.set_index(['control', 'case', 'gene_symbol'])
+
+        df_[df_ < 0] = -1
+        df_[df_ == 0] = 0
+        df_[df_ > 0] = 1
+        df_ = df_.astype(int)
+
+        df_ = (df_
+            .groupby(level=['control', 'case'])
+            .apply(lambda x: (pd
+                .concat([
+                    _edge_weight_computer(permute_columns(x.values))
+                    for _ in range(n_iter)], axis=1)
+                .fillna(0)
+                .sum(axis=1)
+                .astype(int)))
+            .reset_index()
+            .rename({0: 'count'}, axis=1))
+        
+        df_.to_csv(null_distribution_file, sep='\t', index=False)
+    
+    df_ = pd.read_table(null_distribution_file, sep='\t')
+    
+    return df_
+         
 # notebook 1
-def run_differential_expression_analysis():
+def run_differential_expression_analysis(overwrite=False, log_transform_all_geo_data=False):
     """
     Run marginal, per-gene differential expression analyses.
     
@@ -25,24 +104,42 @@ def run_differential_expression_analysis():
     each dataset defined in ``data/datasets.json``, and for each group comparison
     defined in ``data/comparisons.json``.
     
-    Return
-    ------
-    :class:`pd.DataFrame`
-        A dataframe of differential expression effect sizes and p-values
-        for each dataset and case/control comparison, with the columns:
+    Returns
+    -------
+    dict of :class:`pd.DataFrame`
+        A dictionary with dataframes `exprs` and `results`.
         
-            * Name: dataset, dtype: object
-            * Name: control, dtype: object
-            * Name: case, dtype: object
-            * Name: gene_symbol, dtype: object
-            * Name: log_fc, dtype: float
-            * Name: adj_p_val, dtype: float
+        `exprs` contains preprocessed and normalized expression values
+        for each sample and across datasets.
+        
+        `results` contains differential expression effect sizes and p-values
+        for each dataset and case/control comparison.  
+
+    Notes
+    -----
+    For each GSE microarray experiment, the gene expression data pulled from GEO
+    is :math:`\log_2` transformed, if the GEO data is not already :math:`\log`
+    transformed. The transformed data is then quantile-normalized
+    within phenotype group* [1]_.
+    
+    References
+    ----------
+    .. [1] Zhao, Y., Wong, L. & Goh, W.W.B. How to do quantile normalization correctly for gene 
+       expression data analyses. Sci Rep 10, 15534 (2020). 
+       https://doi.org/10.1038/s41598-020-72664-6
     
     Examples
     --------
     >>> import tb_gene_signature_pipeline as tb
-    >>> df_results = tb.run_differential_expression_analysis()
-    >>> df_results.head()
+    >>> diff_expr_results = tb.run_differential_expression_analysis()
+    >>> diff_expr_results['exprs'].head()
+             gene_symbol      gsm_id  preprocessed  normalized phenotype    dataset platform
+    0               A1BG  GSM2712676        71.001    0.738524       atb  GSE101705   rnaseq
+    1               A1BG  GSM2712677        65.999    0.947318       atb  GSE101705   rnaseq
+    2               A1BG  GSM2712678        43.000    0.269351       atb  GSE101705   rnaseq
+    3               A1BG  GSM2712679        41.000    0.310476       atb  GSE101705   rnaseq
+    4               A1BG  GSM2712680        60.000    0.830032       atb  GSE101705   rnaseq
+    >>> diff_expr_results['results'].head()
         dataset control case gene_symbol    log_fc  adj_p_val
     0  GSE19439      hc  atb        A1BG  0.026045   0.917217
     1  GSE19439      hc  atb        A1CF  0.091435   0.468395
@@ -50,15 +147,34 @@ def run_differential_expression_analysis():
     3  GSE19439      hc  atb       A2ML1 -0.171059   0.204401
     4  GSE19439      hc  atb     A3GALT2 -0.008727   0.967318
     """
-    r_script = this_dir / 'R' / 'differential_expression_analysis.R'
+    transformed_data_dir = data_dir / 'transformed-expression-matrices'
+    transformed_data_dir.mkdir(parents=True, exist_ok=True)
 
-    results_file = Path(
-        check_output(r_script).decode('utf8'))
+    normalized_data_dir = data_dir / 'normalized-expression-matrices'
+    normalized_data_dir.mkdir(parents=True, exist_ok=True)
 
-    df = pd.read_table(results_file, sep='\t')
-    results_file.unlink()
+    diff_exp_results_dir = data_dir / 'differential-expression-results'
+    diff_exp_results_dir.mkdir(parents=True, exist_ok=True)
     
-    return df
+    exprs_file = data_dir / 'differential_expression_values.tsv'
+    results_file = data_dir / 'differential_expression_results.tsv'
+
+    if log_transform_all_geo_data:
+        log_transform = 'true'
+    else:
+        log_transform = 'false'
+    
+    if any([not exprs_file.exists(), not results_file.exists(), overwrite]):
+        r_script = this_dir / 'R' / 'differential_expression_analysis.R'
+        check_call([r_script, log_transform])
+
+    df_exprs = pd.read_table(exprs_file, sep='\t')
+    df_results = pd.read_table(results_file, sep='\t')
+    
+    return {
+        'exprs': df_exprs,
+        'results': df_results
+    }
 
 # notebook 2
 def merge_differential_expression_results(
@@ -106,8 +222,10 @@ def merge_differential_expression_results(
     """
     df = differential_expression_df.copy()
     
-    df = df.loc[
-        (df['log_fc'] >= log_fc_thresh) & (df['adj_p_val'] <= adj_pval_thresh)]
+    df['is_sig'] = df.apply(
+        lambda x: (np.abs(x['log_fc']) >= log_fc_thresh) & (x['adj_p_val'] <= adj_pval_thresh),
+        axis=1)
+    df['log_fc'] = df.apply(lambda x: x['log_fc'] if x['is_sig'] else 0.0, axis=1)
     
     df = (df
         .groupby(['control', 'case'])
@@ -120,7 +238,7 @@ def merge_differential_expression_results(
     return df
 
 # notebook 5
-def construct_networks(merged_results_df):
+def construct_networks(merged_results, overwrite=False):
     """
     Construct networks based on shared association signal across
     differential expression analysis datasets. 
@@ -135,7 +253,7 @@ def construct_networks(merged_results_df):
     
     Parameters
     ----------
-    merged_results_df : :class:`pd.DataFrame`
+    merged_results : :class:`pd.DataFrame`
         A gene-by-dataset dataframe of significant log fold change
         effect sizes, as produced by :func:`merge_differential_expression_results`.
         
@@ -186,83 +304,151 @@ def construct_networks(merged_results_df):
     3413      od  atb        NRG1       4         1.333333            1.917126e-11
     
     """
-    df_ = merged_results_df.copy()
+    graph_file = data_dir / 'network_graphs.pkl'
+    nodes_file = data_dir / 'network_nodes.tsv'
     
-    def generate_network_per_comparison(xdf):
-        xdf_ = xdf.copy().reset_index()
-
-        m = xdf_.drop(['control', 'case', 'gene_symbol'], axis=1).values
-        n_datasets = (m.sum(axis=0) > 0).sum()
-
-        m[m > 0] = 1
-        m[m == 0] = 0
-        m[m < 0] = -1
-
-        edge_weights = m.dot(m.T)
-        edge_weights_mask = np.abs(edge_weights) >= 3
-
-        edge_indices = zip(*np.triu(edge_weights_mask).nonzero())
-        gene_symbols = xdf_['gene_symbol']
-
-        network_edge_list = [
-            (gene_symbols[i], gene_symbols[j], float(edge_weights[i,j])/n_datasets)
-            for i, j in edge_indices]
-
-        graph = nx.Graph()
-        graph.add_weighted_edges_from(network_edge_list)
-
-        return graph
+    if any([not graph_file.exists(), not nodes_file.exists(), overwrite]):
     
-    graphs = (df_
-        .groupby(['control', 'case'])
-        .apply(generate_network_per_comparison)
-        .reset_index()
-        .rename({0: 'graph'}, axis=1))
-    
-    def compute_degrees(graphs, weight=None):
-        colname = 'weighted_degree' if weight == 'weight' else 'degree'
-        df_degrees = (graphs
+        df_ = merged_results.copy()
+
+        def generate_network_per_comparison(xdf):
+            xdf_ = xdf.copy().reset_index()
+
+            m = xdf_.drop(['control', 'case', 'gene_symbol'], axis=1).values
+            n_datasets = (m.sum(axis=0) > 0).sum()
+
+            m[m > 0] = 1
+            m[m == 0] = 0
+            m[m < 0] = -1
+
+            edge_weights = m.dot(m.T)
+            edge_weights_mask = np.abs(edge_weights) >= 3
+
+            edge_indices = zip(*np.triu(edge_weights_mask).nonzero())
+            gene_symbols = xdf_['gene_symbol']
+
+            network_edge_list = [
+                (gene_symbols[i], gene_symbols[j], float(edge_weights[i,j])/n_datasets)
+                for i, j in edge_indices]
+
+            graph = nx.Graph()
+            graph.add_weighted_edges_from(network_edge_list)
+
+            return graph
+
+        graphs = (df_
+            .groupby(['control', 'case'])
+            .apply(generate_network_per_comparison)
+            .reset_index()
+            .rename({0: 'graph'}, axis=1))
+
+        def compute_degrees(graphs, weight=None):
+            colname = 'weighted_degree' if weight == 'weight' else 'degree'
+            df_degrees = (graphs
+                .set_index(['control', 'case'])
+                .apply(lambda x: (pd
+                    .DataFrame(
+                        x['graph'].degree(weight=weight))
+                    .to_records(index=False)), axis=1)
+                .reset_index()
+                .explode(0)
+                .reset_index(drop=True))
+            df_degrees['gene_symbol'] = df_degrees[0].apply(lambda x: x[0])
+            df_degrees[colname] = df_degrees[0].apply(lambda x: x[1])
+            df_degrees = df_degrees[['control', 'case', 'gene_symbol', colname]]
+
+            return df_degrees
+
+        df_degrees = compute_degrees(graphs, weight=None)
+        df_weighted = compute_degrees(graphs, weight='weight')
+
+        df_eigens = (graphs
             .set_index(['control', 'case'])
-            .apply(lambda x: (pd
-                .DataFrame(
-                    x['graph'].degree(weight=weight))
-                .to_records(index=False)), axis=1)
+            .apply(lambda x: [
+                (k, v) for k, v in nx.eigenvector_centrality(
+                    x['graph'], weight='weight').items()],
+                axis=1)
             .reset_index()
             .explode(0)
             .reset_index(drop=True))
-        df_degrees['gene_symbol'] = df_degrees[0].apply(lambda x: x[0])
-        df_degrees[colname] = df_degrees[0].apply(lambda x: x[1])
-        df_degrees = df_degrees[['control', 'case', 'gene_symbol', colname]]
+        df_eigens['gene_symbol'] = df_eigens[0].apply(lambda x: x[0])
+        df_eigens['eigenvector_centrality'] = df_eigens[0].apply(lambda x: x[1])
+        df_eigens = df_eigens[['control', 'case', 'gene_symbol', 'eigenvector_centrality']]
+
+        df_nodes = (df_degrees
+            .merge(
+                df_weighted, on=['control', 'case', 'gene_symbol'])
+            .merge(
+                df_eigens, on=['control', 'case', 'gene_symbol']))
         
-        return df_degrees
-    
-    df_degrees = compute_degrees(graphs, weight=None)
-    df_weighted = compute_degrees(graphs, weight='weight')
-    
-    df_eigens = (graphs
-        .set_index(['control', 'case'])
-        .apply(lambda x: [
-            (k, v) for k, v in nx.eigenvector_centrality(
-                x['graph'], weight='weight').items()],
-            axis=1)
-        .reset_index()
-        .explode(0)
-        .reset_index(drop=True))
-    df_eigens['gene_symbol'] = df_eigens[0].apply(lambda x: x[0])
-    df_eigens['eigenvector_centrality'] = df_eigens[0].apply(lambda x: x[1])
-    df_eigens = df_eigens[['control', 'case', 'gene_symbol', 'eigenvector_centrality']]
-    
-    df_nodes = (df_degrees
-        .merge(
-            df_weighted, on=['control', 'case', 'gene_symbol'])
-        .merge(
-            df_eigens, on=['control', 'case', 'gene_symbol']))
+        df_nodes['mean_log_fc'] = (df_nodes
+            .merge(df_, how='inner',
+                   on=['control', 'case', 'gene_symbol'])
+            .drop(['control', 'case', 'gene_symbol', 'degree',
+                   'weighted_degree', 'eigenvector_centrality'], axis=1)
+            .mean(axis=1))
+        
+        with graph_file.open('wb') as f:
+            pickle.dump(graphs, f)
+            
+        df_nodes.to_csv(nodes_file, sep='\t', index=False)
+            
+    with graph_file.open('rb') as f:
+        graphs = pickle.load(f)
+        
+    df_nodes = pd.read_table(nodes_file, sep='\t')
     
     return {
         'graphs': graphs,
         'nodes': df_nodes
     }
 
+def generate_gene_lists(nodes, top_n=100):
+    """
+    Generate gene lists for each comparison by returning the
+    top nodes in each comparison network by ``weighted_degree``.
+    
+    Parameters
+    ----------
+    nodes : :class:`pd.DataFrame`
+        A dataframe of networks node metrics, as returned by the ``nodes``
+        entry of :func:`generate_networks()`.
+    top_n : int
+        Return the ``top_n`` nodes in each comparison network.
+        
+    Return
+    ------
+    dict
+        A dictionary of gene lists, keyed by comparison (e.g. ``'hc-atb'``.)
+        
+    Examples
+    --------
+    >>> import tb_gene_signature_pipeline.network_analysis as tb
+    >>> diff_expr_results = na.run_differential_expression_analysis(
+    ...     log_transform_all_geo_data=False)
+    >>> merged_results = tb.merge_differential_expression_results(
+    ...     differential_expression_results, adj_val_thresh=0.05,
+    ...     log_fc_thresh=np.log2(1.5))
+    >>> networks = tb.construct_networks(merged_results)
+    >>> gene_lists = tb.generate_gene_lists(networks['nodes'], top_n=100)
+        
+    """
+    df_ = nodes.copy()
+    
+    top_nodes = (df_
+        .groupby(['control', 'case'])
+        .apply(lambda x: x.nlargest(top_n, 'weighted_degree')))['gene_symbol']
+
+    top_nodes = (top_nodes
+        .droplevel(2)
+        .groupby(['control', 'case'])
+        .apply(list)
+        .to_dict())
+    
+    top_nodes = {f'{k[0]}-{k[1]}': v for k, v in top_nodes.items()}
+    
+    return top_nodes
+    
 # notebook 6
 def combine_networks_into_lists(networks, n_nodes=100):
     """

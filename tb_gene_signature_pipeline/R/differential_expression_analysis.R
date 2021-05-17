@@ -15,6 +15,14 @@ quietly(library(here))
 quietly(library(edgeR))
 quietly(library(yaml))
 
+args = commandArgs(trailingOnly=TRUE)
+
+if (args[1] == 'true') {
+    log_transform = TRUE
+} else if (args[1] == 'false') {
+    log_transform = FALSE
+}
+
 config = read_yaml(file=here('config.yml'))
 datasets = fromJSON(file=here('data', 'datasets.json'))
 comparisons = fromJSON(file=here('data', 'comparisons.json'))
@@ -69,7 +77,7 @@ is_log_normalized = function(gset) {
 quantile_normalize = function(p, exprs, sample_phenotypes) {
     samples = names(Filter(function(x) { x == p }, sample_phenotypes))
     exprs_norm = preprocessCore::normalize.quantiles(
-        as.matrix(exprs[,samples])) %>% data.frame
+        exprs[,samples]) %>% data.frame
     rownames(exprs_norm) = rownames(exprs)
     colnames(exprs_norm) = samples
     return(exprs_norm)
@@ -79,6 +87,35 @@ code_phenotype = function(gsm_id, phenotypes, control, case) {
     if (phenotypes[[gsm_id]] == control) { return(0) }
     else if (phenotypes[[gsm_id]] == case) { return(1) }
     else { return(NA) }
+}
+                 
+normalize_expression_matrix = function(exprs, dataset) {
+    
+    sample_phenotypes = as.factor(unlist(dataset$phenotypes))
+    phenotype_levels = levels(sample_phenotypes)
+
+    if (dataset$platform == 'rnaseq') {
+        design_matrix = model.matrix(~0 + sample_phenotypes)
+        rownames(design_matrix) = names(sample_phenotypes)
+        colnames(design_matrix) = phenotype_levels
+        
+        dge_list = DGEList(
+            counts=exprs, group=sample_phenotypes, genes=rownames(exprs))
+        norm_factors = calcNormFactors(dge_list)
+        exprs = voom(dge_list, design_matrix)$E
+    }
+    
+    else if (startsWith(dataset$platform, 'GPL')) {
+        # quantile normalize within phenotype groups
+        #norm_dfs = lapply(phenotype_levels, quantile_normalize, exprs, sample_phenotypes)
+        #exprs = as.matrix(bind_cols(norm_dfs))
+        genes = rownames(exprs)
+        exprs = preprocessCore::normalize.quantiles(exprs)
+        rownames(exprs) = genes
+        colnames(exprs) = names(sample_phenotypes)
+    }
+
+    return (exprs)
 }
                  
 fit_differential_expression_model = function(comparison, exprs, dataset, data_dir) {
@@ -98,8 +135,7 @@ fit_differential_expression_model = function(comparison, exprs, dataset, data_di
         
         if (dataset$platform == 'rnaseq') {
             
-            # filter out genes that don't have at least 1 count-per-million in at least half the samples
-            exprs = exprs[rowSums(cpm(exprs)) >= (ncol(exprs)/2),]
+            # normalize data
             dge_list = DGEList(
                 counts=exprs, group=coded_phenotypes, genes=rownames(exprs))
             norm_factors = calcNormFactors(dge_list)
@@ -130,6 +166,13 @@ fit_differential_expression_model = function(comparison, exprs, dataset, data_di
                    log_fc,
                    adj_p_val) 
         
+        # write out results to disk
+        results_path = file.path(
+            data_dir, 'differential-expression-results',
+            paste(dataset$gse_id, paste0(comparison$control, '_vs_', comparison$case),
+                  'diff_expr_results', 'tsv', sep='.'))
+        write.table(results_df, results_path, sep='\t', row.names=FALSE, quote=FALSE)
+        
         return(results_df)
     }
 }
@@ -149,7 +192,7 @@ differential_expression_analysis = function(dataset, comparisons, platforms, dat
         gset = gset[[idx]]
         
         # log normalize expression matrix values if not already
-        if (!is_log_normalized(gset)) {
+        if (log_transform || !is_log_normalized(gset)) {
             
             # values may still be negative due to background subtraction algo, add offset
             min_val = min(exprs(gset), na.rm=TRUE)
@@ -212,19 +255,22 @@ differential_expression_analysis = function(dataset, comparisons, platforms, dat
             select(-probe_sum) %>%
             column_to_rownames('gene_symbol')
         
+        # convert to matrix
+        exprs = as.matrix(exprs_df) 
+        
         # remove null phenotype samples
         is_null = sapply(dataset$phenotypes, is.null)
         keep_samples = intersect(
-            names(is_null)[!is_null], colnames(exprs_df))
+            names(is_null)[!is_null], colnames(exprs))
         dataset$phenotypes = dataset$phenotypes[keep_samples]
-        exprs_df = select(exprs_df, all_of(keep_samples))
+        exprs = exprs[,keep_samples]
         
         # set of unique phenotypes in the dataset
-        phenotypes = unique(dataset$phenotypes)
+        #phenotypes = unique(dataset$phenotypes)
         
         # quantile normalize within phenotype groups
-        norm_dfs = lapply(phenotypes, quantile_normalize, exprs_df, dataset$phenotypes)
-        exprs = as.matrix(bind_cols(norm_dfs))
+        #norm_dfs = lapply(phenotypes, quantile_normalize, exprs_df, dataset$phenotypes)
+        #exprs = as.matrix(bind_cols(norm_dfs))
     }
     
     # process rnaseq datasets
@@ -248,33 +294,92 @@ differential_expression_analysis = function(dataset, comparisons, platforms, dat
             filter(row_number() == 1) %>%
             column_to_rownames('gene_symbol')
             
+        # convert to matrix
+        exprs = as.matrix(df_exprs) 
+            
         # remove null phenotype samples
         is_null = sapply(dataset$phenotypes, is.null)
         keep_samples = intersect(
-            names(is_null)[!is_null], colnames(df_exprs))
+            names(is_null)[!is_null], colnames(exprs))
         dataset$phenotypes = dataset$phenotypes[keep_samples]
-        df_exprs = df_exprs %>% select(all_of(keep_samples))
-        
-        exprs = as.matrix(df_exprs) 
-    }
+        exprs = exprs[,keep_samples]
             
+        # filter out genes that don't have at least 1 count-per-million in at least half the samples
+        exprs = exprs[rowSums(cpm(exprs)) >= (ncol(exprs)/2),]
+    }
+    
+    # write out preprocessed expression matrices
+    exprs_out = exprs %>% data.frame %>% rownames_to_column('gene_symbol')
+    exprs_path = file.path(
+        data_dir, 'transformed-expression-matrices',
+        paste(dataset$gse_id, dataset$platform, 'transformed_expr_matrix', 'tsv', sep='.'))
+    write.table(exprs_out, exprs_path, sep='\t', row.names=FALSE, quote=FALSE)
+
+    # normalize expression data
+    exprs_normalized = normalize_expression_matrix(exprs, dataset)
+            
+    # write out normalized expression matrices
+    exprs_norm_out = exprs_normalized %>% data.frame %>% rownames_to_column('gene_symbol')
+    exprs_norm_path = file.path(
+        data_dir, 'normalized-expression-matrices',
+        paste(dataset$gse_id, dataset$platform, 'normalized_expr_matrix', 'tsv', sep='.'))
+    write.table(exprs_norm_out, exprs_norm_path, sep='\t', row.names=FALSE, quote=FALSE)
+        
+    gse_id = dataset$gse_id
+    platform = dataset$platform
+            
+    # combine preprocessed and normalized values in long dataframe to return
+    expr_return = inner_join(
+        exprs_out %>%
+            pivot_longer(cols=!gene_symbol, names_to='gsm_id', values_to='transformed'),   
+        exprs_norm_out %>%
+            pivot_longer(cols=!gene_symbol, names_to='gsm_id', values_to='normalized'),
+        by=c('gene_symbol', 'gsm_id')) %>%
+            
+        # add sample phenotypes as column
+        inner_join(
+            data.frame(phenotype=unlist(dataset$phenotypes)) %>%
+                rownames_to_column('gsm_id'),
+            by='gsm_id') %>%
+            
+        # order samples by phenotype level
+        arrange(phenotype) %>%
+        mutate(gsm_id=factor(gsm_id, levels=unique(gsm_id))) %>%
+            
+        # add dataset and platform as columns
+        mutate(dataset=gse_id,
+               platform=platform)
+            
+    # run differential expression analysis
     dataset_results_list = lapply(
         comparisons, fit_differential_expression_model,
         exprs, dataset, file.path(data_dir))
-            
     dataset_results_df = bind_rows(dataset_results_list)
     rownames(dataset_results_df) = NULL
             
-    return(dataset_results_df)
+    return_obj = list(
+        expr_df=expr_return,
+        results_df=dataset_results_df)
+
+    return(return_obj)
 }
 
-all_results_list = lapply(
+all_datasets_output = lapply(
     datasets, differential_expression_analysis,
     comparisons, platforms, data_dir)
             
-all_results_df = bind_rows(all_results_list)
+all_exprs_df = bind_rows(
+    lapply(all_datasets_output, function(x) x$expr_df)) %>%
+    select(dataset, platform, gene_symbol, gsm_id, phenotype, transformed, normalized) %>%
+    arrange(dataset, gene_symbol, gsm_id)
             
-tempfile = file.path(data_dir, 'differential_expression_results.tsv')
-write.table(all_results_df, tempfile, quote=FALSE, sep='\t', row.names=FALSE)
-            
-cat(tempfile)
+all_results_df = bind_rows(
+    lapply(all_datasets_output, function(x) x$results_df)) %>%
+    select(dataset, control, case, gene_symbol, log_fc, adj_p_val) %>%
+    arrange(dataset, control, case, gene_symbol)
+
+exprs_file = file.path(data_dir, 'differential_expression_values.tsv')
+results_file = file.path(data_dir, 'differential_expression_results.tsv')
+           
+write.table(all_exprs_df, exprs_file, sep='\t', row.names=FALSE, quote=FALSE)       
+write.table(all_results_df, results_file, sep='\t', row.names=FALSE, quote=FALSE)

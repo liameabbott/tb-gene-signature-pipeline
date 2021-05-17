@@ -12,6 +12,7 @@
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Machine Learning Pipeline" href="machine_learning_pipeline.html" />
@@ -36,7 +37,7 @@
 <h1>Network Analysis<a class="headerlink" href="#network-analysis" title="Permalink to this headline">¶</a></h1>
 <dl class="py function">
 <dt id="tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis">
-<code class="sig-name descname"><span class="pre">run_differential_expression_analysis</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">run_differential_expression_analysis</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis" title="Permalink to this definition">¶</a></dt>
 <dd><p>Run marginal, per-gene differential expression analyses.</p>
 <p>This function calls the differential analysis script
 <code class="docutils literal notranslate"><span class="pre">tb-gene-signature-pipeline/R/differential_expression_analysis.R</span></code>.</p>
@@ -45,28 +46,41 @@ each dataset defined in <code class="docutils literal notranslate"><span class="
 defined in <code class="docutils literal notranslate"><span class="pre">data/comparisons.json</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p><p>A dataframe of differential expression effect sizes and p-values
-for each dataset and case/control comparison, with the columns:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>Name: dataset, dtype: object</p></li>
-<li><p>Name: control, dtype: object</p></li>
-<li><p>Name: case, dtype: object</p></li>
-<li><p>Name: gene_symbol, dtype: object</p></li>
-<li><p>Name: log_fc, dtype: float</p></li>
-<li><p>Name: adj_p_val, dtype: float</p></li>
-</ul>
-</div></blockquote>
-</p>
+<dd class="field-odd"><p>A dictionary with dataframes <cite>exprs</cite> and <cite>results</cite>.</p>
 </dd>
 <dt class="field-even">Return type</dt>
-<dd class="field-even"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
+<dd class="field-even"><p><p>dict of <code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
+<p><cite>exprs</cite> contains preprocessed and normalized expression values
+for each sample and across datasets.</p>
+<p><cite>results</cite> contains differential expression effect sizes and p-values
+for each dataset and case/control comparison.</p>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>For each GSE microarray experiment, the gene expression data pulled from GEO
+is <span class="math notranslate nohighlight">\(\log_2\)</span> transformed, if the GEO data is not already <span class="math notranslate nohighlight">\(\log\)</span>
+transformed. The transformed data is then quantile-normalized
+within phenotype group* <a class="footnote-reference brackets" href="#id2" id="id1">1</a>.</p>
+<p class="rubric">References</p>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Zhao, Y., Wong, L. &amp; Goh, W.W.B. How to do quantile normalization correctly for gene
+expression data analyses. Sci Rep 10, 15534 (2020).
+<a class="reference external" href="https://doi.org/10.1038/s41598-020-72664-6">https://doi.org/10.1038/s41598-020-72664-6</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">tb_gene_signature_pipeline</span> <span class="k">as</span> <span class="nn">tb</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">df_results</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">run_differential_expression_analysis</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">df_results</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">diff_expr_results</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">run_differential_expression_analysis</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">diff_expr_results</span><span class="p">[</span><span class="s1">&#39;exprs&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+<span class="go">         gene_symbol      gsm_id  preprocessed  normalized phenotype    dataset platform</span>
+<span class="go">0               A1BG  GSM2712676        71.001    0.738524       atb  GSE101705   rnaseq</span>
+<span class="go">1               A1BG  GSM2712677        65.999    0.947318       atb  GSE101705   rnaseq</span>
+<span class="go">2               A1BG  GSM2712678        43.000    0.269351       atb  GSE101705   rnaseq</span>
+<span class="go">3               A1BG  GSM2712679        41.000    0.310476       atb  GSE101705   rnaseq</span>
+<span class="go">4               A1BG  GSM2712680        60.000    0.830032       atb  GSE101705   rnaseq</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">diff_expr_results</span><span class="p">[</span><span class="s1">&#39;results&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
 <span class="go">    dataset control case gene_symbol    log_fc  adj_p_val</span>
 <span class="go">0  GSE19439      hc  atb        A1BG  0.026045   0.917217</span>
 <span class="go">1  GSE19439      hc  atb        A1CF  0.091435   0.468395</span>

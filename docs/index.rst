@@ -6,6 +6,8 @@
 Welcome to tb-gene-signature-pipeline's documentation!
 ======================================================
 
+Hello, this is a test!
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
