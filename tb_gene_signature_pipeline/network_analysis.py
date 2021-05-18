@@ -133,7 +133,7 @@ def generate_null_edge_weight_distributions(merged_results, n_iter=1, overwrite=
             .groupby(level=['control', 'case'])
             .apply(lambda x: (pd
                 .concat([
-                    _edge_weight_computer(permute_columns(x.values))
+                    _edge_weight_computer(_permute_columns(x.values))
                     for _ in range(n_iter)], axis=1)
                 .fillna(0)
                 .sum(axis=1)

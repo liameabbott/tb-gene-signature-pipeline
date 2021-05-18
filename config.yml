@@ -1,3 +1,2 @@
 ---
-data_directory: "/efs/liam/tb-gene-signature-datasets/network-analysis/convert-to-scripts"
-rnaseq_dataset_directory: "/efs/liam/tb-gene-signature-datasets/network-analysis/convert-to-scripts/rnaseq-datasets"
+data_directory: "/efs/bioinformatics/tb-gene-signature-pipeline"

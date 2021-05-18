@@ -35,7 +35,7 @@ srr_gsm_id_map = read.table(
     column_to_rownames('srr_id')
 
 data_dir = config$data_directory
-rnaseq_dir = config$rnaseq_dataset_directory
+rnaseq_dir = file.path(data_dir, 'rnaseq-datasets')
 
 is_log_normalized = function(gset) {
 
