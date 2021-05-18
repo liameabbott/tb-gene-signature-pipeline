@@ -45,17 +45,38 @@
 <p>An independent case/control differential expression analysis is run for
 each dataset defined in <code class="docutils literal notranslate"><span class="pre">data/datasets.json</span></code>, and for each group comparison
 defined in <code class="docutils literal notranslate"><span class="pre">data/comparisons.json</span></code>.</p>
+<p>Below, <cite>&lt;data_dir&gt;</cite> refers to the path specified by the <cite>data_directory</cite> in the
+project config file (<cite>confi.yml</cite>).</p>
+<p>All transformed expression values for each dataset are written to files
+<cite>&lt;data_dir&gt;/transformed-expression-matrices/&lt;gse_id&gt;.&lt;dataset_platform&gt;.transformed_expr_matrix.tsv</cite>.</p>
+<p>All normalized expression values for each dataset are written to files
+<cite>&lt;data_dir&gt;/normalized-expression-matrices/&lt;gse_id&gt;.&lt;dataset_platform&gt;.normalized_expr_matrix.tsv</cite>.</p>
+<p>Combined transformed and expression values for all datasets are written to a single file
+<cite>&lt;data_dir&gt;/differential_expression_values.tsv</cite>.</p>
+<p>All differential expression results for each dataset are written to files
+<cite>&lt;data_dir&gt;/differential-expression-results/&lt;gse_id&gt;.&lt;control&gt;_vs_&lt;case&gt;.diff_expr_results.tsv</cite>.</p>
+<p>Combined differential expression results for all datasets are written to a single file
+<cite>&lt;data_dir&gt;/differential_expression_results.tsv</cite>.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p><p>A dictionary with dataframes <cite>exprs</cite> and <cite>results</cite>.</p>
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>overwrite</strong> (<em>bool</em>) – If output files already exist and <code class="docutils literal notranslate"><span class="pre">overwrite</span></code> is <cite>False</cite>, read
+in existing files instead of re-running analysis.</p></li>
+<li><p><strong>log_transform_all_geo_data</strong> (<em>bool</em>) – If <cite>True</cite>, log-transform all microarray data downloaded from GEO,
+regardless of whether or not it’s already been transformed. If <cite>False</cite>,
+only log-transform dataset if it is not already log-transformed.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>A dictionary with dataframes <cite>exprs</cite> and <cite>results</cite>.</p>
 <p><cite>exprs</cite> contains preprocessed and normalized expression values
 for each sample and across datasets.</p>
 <p><cite>results</cite> contains differential expression effect sizes and p-values
 for each dataset and case/control comparison.</p>
 </p>
 </dd>
-<dt class="field-even">Return type</dt>
-<dd class="field-even"><p>dict of <code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>dict of <code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
@@ -149,7 +170,35 @@ with the columns:</p>
 <dl class="py function">
 <dt id="tb_gene_signature_pipeline.network_analysis.compute_edge_weight_distributions">
 <code class="sig-name descname">compute_edge_weight_distributions</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">merged_results</span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.compute_edge_weight_distributions" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Given a dataframe of significant log-FC results from each comparison,
+return the distribution of edge weights used to construct the networks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>merged_results</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – A gene-by-dataset dataframe of significant log fold change
+effect sizes, as produced by <a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results"><code class="xref py py-func docutils literal notranslate"><span class="pre">merge_differential_expression_results()</span></code></a>.</p></li>
+<li><p><strong>overwrite</strong> (<em>bool</em>) – If output files already exist and <code class="docutils literal notranslate"><span class="pre">overwrite</span></code> is <cite>False</cite>, read
+in existing files instead of re-running analysis.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A dataframe with edge weight counts for each comparison</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">tb_gene_signature.network_analysis</span> <span class="k">as</span> <span class="nn">na</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">diff_expr_results</span> <span class="o">=</span> <span class="n">na</span><span class="o">.</span><span class="n">run_differential_expression_analysis</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">merged_results</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">merge_differential_expression_results</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">adj_pval_thresh</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">log_fc_thresh</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="mf">1.5</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">edge_weight_distributions</span> <span class="o">=</span> <span class="n">na</span><span class="o">.</span><span class="n">compute_edge_weight_distributions</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">merged_results</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">edge_weight_distributions</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
 
 <div class="line-block">
 <div class="line"><br /></div>
@@ -157,7 +206,36 @@ with the columns:</p>
 <dl class="py function">
 <dt id="tb_gene_signature_pipeline.network_analysis.generate_null_edge_weight_distributions">
 <code class="sig-name descname">generate_null_edge_weight_distributions</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">merged_results</span></em>, <em class="sig-param"><span class="n">n_iter</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.generate_null_edge_weight_distributions" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Generate null edge weight distributions via permutations of the
+<code class="docutils literal notranslate"><span class="pre">merged_results</span></code> matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>merged_results</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – A gene-by-dataset dataframe of significant log fold change
+effect sizes, as produced by <a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results"><code class="xref py py-func docutils literal notranslate"><span class="pre">merge_differential_expression_results()</span></code></a>.</p></li>
+<li><p><strong>n_iter</strong> (<em>int</em>) – The number of iterations to perform in the null edge weight sampling process.</p></li>
+<li><p><strong>overwrite</strong> (<em>bool</em>) – If output files already exist and <code class="docutils literal notranslate"><span class="pre">overwrite</span></code> is <cite>False</cite>, read
+in existing files instead of re-running analysis.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A dataframe with edge weight counts for each comparison</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">tb_gene_signature.network_analysis</span> <span class="k">as</span> <span class="nn">na</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">diff_expr_results</span> <span class="o">=</span> <span class="n">na</span><span class="o">.</span><span class="n">run_differential_expression_analysis</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">merged_results</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">merge_differential_expression_results</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">adj_pval_thresh</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">log_fc_thresh</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="mf">1.5</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">null_distributions</span> <span class="o">=</span> <span class="n">na</span><span class="o">.</span><span class="n">generate_null_edge_weight_distributions</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">merged_results</span><span class="p">,</span> <span class="n">n_iter</span><span class="o">=</span><span class="mi">25</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">null_distributions</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
 
 <div class="line-block">
 <div class="line"><br /></div>
@@ -173,10 +251,18 @@ differential expression analysis datasets.</p>
 nodes represents indicates that those two genes had significant
 differential expression associations in the <strong>same</strong> direction in
 <strong>at least 3</strong> datasets.</p>
+<p>Pickled network graphs for each comparison network are written to
+<cite>&lt;data_dir&gt;/network_graphs.pkl</cite>.</p>
+<p>Measures for each node in all comparison networks are written to a single
+file <cite>&lt;data_dir&gt;/network_nodes.tsv</cite>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>merged_results</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – A gene-by-dataset dataframe of significant log fold change
-effect sizes, as produced by <a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results"><code class="xref py py-func docutils literal notranslate"><span class="pre">merge_differential_expression_results()</span></code></a>.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>merged_results</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – A gene-by-dataset dataframe of significant log fold change
+effect sizes, as produced by <a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results"><code class="xref py py-func docutils literal notranslate"><span class="pre">merge_differential_expression_results()</span></code></a>.</p></li>
+<li><p><strong>overwrite</strong> (<em>bool</em>) – If output files already exist and <code class="docutils literal notranslate"><span class="pre">overwrite</span></code> is <cite>False</cite>, read
+in existing files instead of re-running analysis.</p></li>
+</ul>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p><dl>
