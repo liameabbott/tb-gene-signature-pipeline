@@ -6,12 +6,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Network Analysis &#8212; tb-gene-signature-pipeline 0.1 documentation</title>
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script src="_static/jquery.js"></script>
     <script src="_static/underscore.js"></script>
     <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
     <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -37,7 +38,7 @@
 <h1>Network Analysis<a class="headerlink" href="#network-analysis" title="Permalink to this headline">¶</a></h1>
 <dl class="py function">
 <dt id="tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis">
-<code class="sig-name descname"><span class="pre">run_differential_expression_analysis</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">run_differential_expression_analysis</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">log_transform_all_geo_data</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis" title="Permalink to this definition">¶</a></dt>
 <dd><p>Run marginal, per-gene differential expression analyses.</p>
 <p>This function calls the differential analysis script
 <code class="docutils literal notranslate"><span class="pre">tb-gene-signature-pipeline/R/differential_expression_analysis.R</span></code>.</p>
@@ -46,15 +47,15 @@ each dataset defined in <code class="docutils literal notranslate"><span class="
 defined in <code class="docutils literal notranslate"><span class="pre">data/comparisons.json</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>A dictionary with dataframes <cite>exprs</cite> and <cite>results</cite>.</p>
-</dd>
-<dt class="field-even">Return type</dt>
-<dd class="field-even"><p><p>dict of <code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
+<dd class="field-odd"><p><p>A dictionary with dataframes <cite>exprs</cite> and <cite>results</cite>.</p>
 <p><cite>exprs</cite> contains preprocessed and normalized expression values
 for each sample and across datasets.</p>
 <p><cite>results</cite> contains differential expression effect sizes and p-values
 for each dataset and case/control comparison.</p>
 </p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>dict of <code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code></p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
@@ -96,7 +97,7 @@ expression data analyses. Sci Rep 10, 15534 (2020).
 </div>
 <dl class="py function">
 <dt id="tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results">
-<code class="sig-name descname"><span class="pre">merge_differential_expression_results</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">differential_expression_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">adj_pval_thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_fc_thresh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5849625007211562</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">merge_differential_expression_results</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">differential_expression_df</span></em>, <em class="sig-param"><span class="n">adj_pval_thresh</span><span class="o">=</span><span class="default_value">0.05</span></em>, <em class="sig-param"><span class="n">log_fc_thresh</span><span class="o">=</span><span class="default_value">0.5849625007211562</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a <code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code> of differential expression results
 (as generated by <a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis" title="tb_gene_signature_pipeline.network_analysis.run_differential_expression_analysis"><code class="xref py py-func docutils literal notranslate"><span class="pre">run_differential_expression_analysis()</span></code></a>), return
 significant log fold change results.</p>
@@ -146,8 +147,24 @@ with the columns:</p>
 <div class="line"><br /></div>
 </div>
 <dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.compute_edge_weight_distributions">
+<code class="sig-name descname">compute_edge_weight_distributions</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">merged_results</span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.compute_edge_weight_distributions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<dl class="py function">
+<dt id="tb_gene_signature_pipeline.network_analysis.generate_null_edge_weight_distributions">
+<code class="sig-name descname">generate_null_edge_weight_distributions</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">merged_results</span></em>, <em class="sig-param"><span class="n">n_iter</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.generate_null_edge_weight_distributions" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<dl class="py function">
 <dt id="tb_gene_signature_pipeline.network_analysis.construct_networks">
-<code class="sig-name descname"><span class="pre">construct_networks</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">merged_results_df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.construct_networks" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">construct_networks</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">merged_results</span></em>, <em class="sig-param"><span class="n">overwrite</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.construct_networks" title="Permalink to this definition">¶</a></dt>
 <dd><p>Construct networks based on shared association signal across
 differential expression analysis datasets.</p>
 <p>One network is created for each case/control comparison
@@ -158,7 +175,7 @@ differential expression associations in the <strong>same</strong> direction in
 <strong>at least 3</strong> datasets.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>merged_results_df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – A gene-by-dataset dataframe of significant log fold change
+<dd class="field-odd"><p><strong>merged_results</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – A gene-by-dataset dataframe of significant log fold change
 effect sizes, as produced by <a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results" title="tb_gene_signature_pipeline.network_analysis.merge_differential_expression_results"><code class="xref py py-func docutils literal notranslate"><span class="pre">merge_differential_expression_results()</span></code></a>.</p>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -228,50 +245,34 @@ effect sizes, as produced by <a class="reference internal" href="#tb_gene_signat
 <div class="line"><br /></div>
 </div>
 <dl class="py function">
-<dt id="tb_gene_signature_pipeline.network_analysis.combine_networks_into_lists">
-<code class="sig-name descname"><span class="pre">combine_networks_into_lists</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">networks</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_nodes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.combine_networks_into_lists" title="Permalink to this definition">¶</a></dt>
-<dd><p>Generate gene lists based on intersections and differences between the
-top <code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> nodes in each comparison network (<code class="docutils literal notranslate"><span class="pre">hc</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code>,
-<code class="docutils literal notranslate"><span class="pre">od</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code>, and <cite>ltbi`</cite> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code> - exclude the almost
-nonexistent <code class="docutils literal notranslate"><span class="pre">hc</span></code> vs. <code class="docutils literal notranslate"><span class="pre">ltbi</span></code> network).</p>
+<dt id="tb_gene_signature_pipeline.network_analysis.generate_gene_lists">
+<code class="sig-name descname">generate_gene_lists</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">nodes</span></em>, <em class="sig-param"><span class="n">top_n</span><span class="o">=</span><span class="default_value">100</span></em><span class="sig-paren">)</span><a class="headerlink" href="#tb_gene_signature_pipeline.network_analysis.generate_gene_lists" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generate gene lists for each comparison by returning the
+top nodes in each comparison network by <code class="docutils literal notranslate"><span class="pre">weighted_degree</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>graphs</strong> (<em>dict</em>) – A dictionary of network graphs and node metrics, as returned by
-<a class="reference internal" href="#tb_gene_signature_pipeline.network_analysis.construct_networks" title="tb_gene_signature_pipeline.network_analysis.construct_networks"><code class="xref py py-func docutils literal notranslate"><span class="pre">construct_networks()</span></code></a>.</p></li>
-<li><p><strong>n_nodes</strong> (<em>int</em>) – Gene lists will be generated based on the top <code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> nodes
-by weighted degree in each comparison network.</p></li>
+<li><p><strong>nodes</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – A dataframe of networks node metrics, as returned by the <code class="docutils literal notranslate"><span class="pre">nodes</span></code>
+entry of <code class="xref py py-func docutils literal notranslate"><span class="pre">generate_networks()</span></code>.</p></li>
+<li><p><strong>top_n</strong> (<em>int</em>) – Return the <code class="docutils literal notranslate"><span class="pre">top_n</span></code> nodes in each comparison network.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><p>A dictionary of gene lists with two entries:</p>
-<dl class="simple">
-<dt><code class="docutils literal notranslate"><span class="pre">'top_genes_in_all_networks'</span></code>: The intersection of the top</dt><dd><p><code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> genes by weighted degree in the <code class="docutils literal notranslate"><span class="pre">hc</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code>,
-<code class="docutils literal notranslate"><span class="pre">ltbi</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code>, and <code class="docutils literal notranslate"><span class="pre">od</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code> networks.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">'top_genes_not_in_od_network'</span></code>: The intersection of the top</dt><dd><p><code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> genes by weighted degree in the <code class="docutils literal notranslate"><span class="pre">hc</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code>
-and <code class="docutils literal notranslate"><span class="pre">ltbi</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code> networks, minus the genes in the top
-<code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> of the <code class="docutils literal notranslate"><span class="pre">od</span></code> vs. <code class="docutils literal notranslate"><span class="pre">atb</span></code> network.</p>
-</dd>
-</dl>
-</p>
+<dd class="field-even"><p>A dictionary of gene lists, keyed by comparison (e.g. <code class="docutils literal notranslate"><span class="pre">'hc-atb'</span></code>.)</p>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>dict</p>
 </dd>
 </dl>
-<p class="rubric">Example</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">tb_gene_signature_pipeline</span> <span class="k">as</span> <span class="nn">tb</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">differential_expression_results</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">run_differential_expression_analysis</span><span class="p">()</span>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">tb_gene_signature_pipeline.network_analysis</span> <span class="k">as</span> <span class="nn">tb</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">diff_expr_results</span> <span class="o">=</span> <span class="n">na</span><span class="o">.</span><span class="n">run_differential_expression_analysis</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">log_transform_all_geo_data</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">merged_results</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">merge_differential_expression_results</span><span class="p">(</span>
 <span class="gp">... </span>    <span class="n">differential_expression_results</span><span class="p">,</span> <span class="n">adj_val_thresh</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
 <span class="gp">... </span>    <span class="n">log_fc_thresh</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="mf">1.5</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">networks</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">construct_networks</span><span class="p">(</span><span class="n">merged_results</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">gene_lists</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">combine_networks_into_lists</span><span class="p">(</span><span class="n">networks</span><span class="p">,</span> <span class="n">n_nodes</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">gene_lists</span><span class="p">[</span><span class="s1">&#39;top_genes_in_all_networks&#39;</span><span class="p">][:</span><span class="mi">5</span><span class="p">])</span>
-<span class="go">[&#39;SAMD9L&#39;, &#39;KCNJ15&#39;, &#39;LAP3&#39;, &#39;CEACAM1&#39;, &#39;SERPING1&#39;]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">gene_lists</span><span class="p">[</span><span class="s1">&#39;top_genes_not_in_od_network&#39;</span><span class="p">][:</span><span class="mi">5</span><span class="p">])</span>
-<span class="go">[&#39;TLR5&#39;, &#39;JAK2&#39;, &#39;S100A12&#39;, &#39;ZNF438&#39;, &#39;SORT1&#39;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">gene_lists</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">generate_gene_lists</span><span class="p">(</span><span class="n">networks</span><span class="p">[</span><span class="s1">&#39;nodes&#39;</span><span class="p">],</span> <span class="n">top_n</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -339,7 +340,7 @@ and <code class="docutils literal notranslate"><span class="pre">ltbi</span></co
       &copy;2021, Liam Abbott.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.5.4</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

@@ -107,12 +107,12 @@ normalize_expression_matrix = function(exprs, dataset) {
     
     else if (startsWith(dataset$platform, 'GPL')) {
         # quantile normalize within phenotype groups
-        #norm_dfs = lapply(phenotype_levels, quantile_normalize, exprs, sample_phenotypes)
-        #exprs = as.matrix(bind_cols(norm_dfs))
-        genes = rownames(exprs)
-        exprs = preprocessCore::normalize.quantiles(exprs)
-        rownames(exprs) = genes
-        colnames(exprs) = names(sample_phenotypes)
+        norm_dfs = lapply(phenotype_levels, quantile_normalize, exprs, sample_phenotypes)
+        exprs = as.matrix(bind_cols(norm_dfs))
+        #genes = rownames(exprs)
+        #exprs = preprocessCore::normalize.quantiles(exprs)
+        #rownames(exprs) = genes
+        #colnames(exprs) = names(sample_phenotypes)
     }
 
     return (exprs)

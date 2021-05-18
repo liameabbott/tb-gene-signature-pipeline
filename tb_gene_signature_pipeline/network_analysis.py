@@ -37,6 +37,33 @@ def _permute_columns(m):
 
 def compute_edge_weight_distributions(merged_results, overwrite=False):
     """
+    Given a dataframe of significant log-FC results from each comparison,
+    return the distribution of edge weights used to construct the networks.
+    
+    Parameters
+    ----------
+    merged_results : :class:`pd.DataFrame`
+        A gene-by-dataset dataframe of significant log fold change
+        effect sizes, as produced by :func:`merge_differential_expression_results`.
+    overwrite : bool
+        If output files already exist and ``overwrite`` is `False`, read
+        in existing files instead of re-running analysis.
+        
+    Return
+    ------
+    :class:`pd.DataFrame`
+        A dataframe with edge weight counts for each comparison
+        
+    Example
+    -------
+    >>> import tb_gene_signature.network_analysis as na
+    >>> diff_expr_results = na.run_differential_expression_analysis()
+    >>> merged_results = tb.merge_differential_expression_results(
+    ...     adj_pval_thresh=0.05, log_fc_thresh=np.log2(1.5))
+    >>> edge_weight_distributions = na.compute_edge_weight_distributions(
+    ...     merged_results)
+    >>> edge_weight_distributions.head()
+    
     """
     edge_weights_file = data_dir / 'edge_weights.tsv'
     
@@ -62,6 +89,34 @@ def compute_edge_weight_distributions(merged_results, overwrite=False):
 
 def generate_null_edge_weight_distributions(merged_results, n_iter=1, overwrite=False):
     """
+    Generate null edge weight distributions via permutations of the
+    ``merged_results`` matrix.
+    
+    Parameters
+    ----------
+    merged_results : :class:`pd.DataFrame`
+        A gene-by-dataset dataframe of significant log fold change
+        effect sizes, as produced by :func:`merge_differential_expression_results`.
+    n_iter : int
+        The number of iterations to perform in the null edge weight sampling process.
+    overwrite : bool
+        If output files already exist and ``overwrite`` is `False`, read
+        in existing files instead of re-running analysis.
+        
+    Return
+    ------
+    :class:`pd.DataFrame`
+        A dataframe with edge weight counts for each comparison
+        
+    Example
+    -------
+    >>> import tb_gene_signature.network_analysis as na
+    >>> diff_expr_results = na.run_differential_expression_analysis()
+    >>> merged_results = tb.merge_differential_expression_results(
+    ...     adj_pval_thresh=0.05, log_fc_thresh=np.log2(1.5))
+    >>> null_distributions = na.generate_null_edge_weight_distributions(
+    ...     merged_results, n_iter=25)
+    >>> null_distributions.head()
     """
     null_distribution_file = data_dir / 'edge_weight_null_distributions.tsv'
     
@@ -103,6 +158,34 @@ def run_differential_expression_analysis(overwrite=False, log_transform_all_geo_
     An independent case/control differential expression analysis is run for
     each dataset defined in ``data/datasets.json``, and for each group comparison
     defined in ``data/comparisons.json``.
+    
+    Below, `<data_dir>` refers to the path specified by the `data_directory` in the
+    project config file (`confi.yml`).
+    
+    All transformed expression values for each dataset are written to files
+    `<data_dir>/transformed-expression-matrices/<gse_id>.<dataset_platform>.transformed_expr_matrix.tsv`.
+    
+    All normalized expression values for each dataset are written to files
+    `<data_dir>/normalized-expression-matrices/<gse_id>.<dataset_platform>.normalized_expr_matrix.tsv`.
+    
+    Combined transformed and expression values for all datasets are written to a single file
+    `<data_dir>/differential_expression_values.tsv`.
+    
+    All differential expression results for each dataset are written to files
+    `<data_dir>/differential-expression-results/<gse_id>.<control>_vs_<case>.diff_expr_results.tsv`.
+    
+    Combined differential expression results for all datasets are written to a single file
+    `<data_dir>/differential_expression_results.tsv`.
+    
+    Parameters
+    ----------
+    overwrite : bool
+        If output files already exist and ``overwrite`` is `False`, read
+        in existing files instead of re-running analysis.
+    log_transform_all_geo_data : bool
+        If `True`, log-transform all microarray data downloaded from GEO,
+        regardless of whether or not it's already been transformed. If `False`,
+        only log-transform dataset if it is not already log-transformed.
     
     Returns
     -------
@@ -249,13 +332,22 @@ def construct_networks(merged_results, overwrite=False):
     Within each network, a node represents a gene, and an edge between
     nodes represents indicates that those two genes had significant
     differential expression associations in the **same** direction in
-    **at least 3** datasets. 
+    **at least 3** datasets.
+    
+    Pickled network graphs for each comparison network are written to
+    `<data_dir>/network_graphs.pkl`.
+    
+    Measures for each node in all comparison networks are written to a single
+    file `<data_dir>/network_nodes.tsv`.
     
     Parameters
     ----------
     merged_results : :class:`pd.DataFrame`
         A gene-by-dataset dataframe of significant log fold change
         effect sizes, as produced by :func:`merge_differential_expression_results`.
+    overwrite : bool
+        If output files already exist and ``overwrite`` is `False`, read
+        in existing files instead of re-running analysis.
         
     Return
     ------

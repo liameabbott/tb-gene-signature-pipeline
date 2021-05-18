@@ -11,11 +11,19 @@ Network Analysis
 
 |
 
+.. autofunction:: compute_edge_weight_distributions
+
+|
+
+.. autofunction:: generate_null_edge_weight_distributions
+
+|
+
 .. autofunction:: construct_networks
 
 |
 
-.. autofunction:: combine_networks_into_lists
+.. autofunction:: generate_gene_lists
 
 |
 
