@@ -1,2 +1,4 @@
 ---
-data_directory: "/efs/bioinformatics/tb-gene-signature-pipeline"
+rnaseq_directory: "/efs/bioinformatics/tb-gene-signature-pipeline/rnaseq-datasets"
+output_directory: "/efs/bioinformatics/tb-gene-signature-pipeline/rsem"
+wenhan_processed_data_directory: "/efs/bioinformatics/tb-gene-signature-pipeline/wenhan-processed-data"

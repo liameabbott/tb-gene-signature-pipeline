@@ -14,6 +14,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.ticker import FormatStrFormatter
 import seaborn as sns
 import warnings
+import statsmodels.api as sm
 warnings.filterwarnings('ignore')
 
 blue = '#4E79A7'
@@ -95,17 +96,32 @@ def plot_n_datasets_differentially_expressed(merged_results):
     """
     df_ = merged_results.copy()
     
+    dfs = []
+    for (control, case), df in merged_results.items():
+        df_ = df.copy().set_index('gene_symbol')
+        df_ = (df_ != 0)
+        df_ = (df_
+            .sum(axis=1)
+            .reset_index()
+            .rename({0: 'n_datasets'}, axis=1))
+        df_['control'] = control
+        df_['case'] = case
+        dfs.append(df_)
+        
+    df_plot = pd.concat(dfs)
+    
+    """
     df_ = df_.set_index(['control', 'case', 'gene_symbol'])
-
     df_ = (df_ != 0)
     df_ = (df_
         .sum(axis=1)
         .reset_index()
         .rename({0: 'n_datasets'}, axis=1))
+    """
 
     plotnine.options.figure_size = (12, 6)
     p = (
-        ggplot(df_) +
+        ggplot(df_plot) +
         geom_bar(
             aes(x='n_datasets'),
             fill=blue) +
@@ -124,31 +140,37 @@ def plot_n_datasets_differentially_expressed(merged_results):
     
     return p
 
-def plot_edge_weight_distributions(edge_weight_distrs, null_edge_weight_distrs, plot_type='bar'):
+def plot_edge_weight_distributions(edge_weight_distrs, null_edge_weight_distrs):
     """
     """
-    edge_weights_ = edge_weight_distrs.copy()
-    null_edge_weights_ = null_edge_weight_distrs.copy()
+    dfs = []
     
-    edge_weights_ = edge_weights_.rename({'count': 'actual'}, axis=1)
-    null_edge_weights_ = null_edge_weights_.rename({'count': 'null'}, axis=1)
+    for (control, case), edge_weights in edge_weight_distrs.items():
+        edge_weights_ = (pd
+            .DataFrame(edge_weights.copy())
+            .reset_index())
+        edge_weights_['distribution'] = 'actual'
+        
+        null_weights_ = (pd
+            .DataFrame(null_edge_weight_distrs[(control, case)].copy())
+            .reset_index())
+        null_weights_['distribution'] = 'null'
+        
+        df_ = pd.concat([edge_weights_, null_weights_])
+        df_ = df_.fillna(0)
+        df_['control'] = control
+        df_['case'] = case
+        
+        dfs.append(df_)
+        
+    df_plot = pd.concat(dfs)
     
-    df_ = pd.merge(
-        edge_weights_, null_edge_weights_, how='outer',
-        on=['control', 'case', 'edge_weight'])
-    
-    df_ = df_.melt(
-        id_vars=['control', 'case', 'edge_weight'],
-        value_vars=['actual', 'null'],
-        var_name='distribution',
-        value_name='count')
-    
-    df_['is_sig'] = df_['edge_weight'].abs() >= 3
+    df_plot['is_sig'] = df_plot['edge_weight'].abs() >= 3
     
     plotnine.options.figure_size = (14, 6)
     
     p = (
-        ggplot(df_) +
+        ggplot(df_plot) +
         geom_col(
             aes(x='edge_weight',
                 y='count',
@@ -156,10 +178,10 @@ def plot_edge_weight_distributions(edge_weight_distrs, null_edge_weight_distrs, 
                 alpha='is_sig'),
             stat='identity',
             position='dodge') +
-        geom_line(
-            aes(x='edge_weight',
-                y='count',
-                color='distribution')) +
+        #geom_smooth(
+        #    df_plot.loc[df_plot['distribution'] == 'actual'],
+        #    aes(x='edge_weight',
+        #        y='count')) +
         facet_wrap(
             '~ control + case',
             ncol=2) +
@@ -185,7 +207,7 @@ def plot_edge_weight_distributions(edge_weight_distrs, null_edge_weight_distrs, 
 
     return p
 
-def plot_node_measure_distributions(nodes, measure, top_n=100):
+def plot_node_measure_distributions(networks, measure, top_n=100):
     """
     Parameters
     ------
@@ -219,29 +241,37 @@ def plot_node_measure_distributions(nodes, measure, top_n=100):
     >>> weighted_degrees_distribution.draw()
     
     """
-    df_ = nodes.copy()
-    df_ = df_.loc[:, ['control', 'case', 'gene_symbol', measure]]
-
-    top_n_ = (df_
-        .groupby(['control', 'case'])
-        .apply(lambda x: x.nlargest(top_n, measure))
-        .reset_index(drop=True))[['control', 'case', 'gene_symbol']]
+    dfs = []
     
-    top_n_['top_n'] = True
+    for (control, case), df in networks['nodes'].items():
+        
+        df_ = df.copy()
+        df_ = df_[['gene_symbol', measure]]
+        
+        df_top_n = df_.nlargest(top_n, measure)
+        df_top_n['top_n'] = True
+        df_top_n = df_top_n[['gene_symbol', 'top_n']]
+        
+        df_ = df_.merge(df_top_n, how='left', on='gene_symbol')
+        df_['top_n'] = df_['top_n'].fillna(False)
+        
+        df_['control'] = control
+        df_['case'] = case
+        
+        dfs.append(df_)
+        
+    df_plot = pd.concat(dfs)
     
-    df_ = df_.merge(top_n_, how='left', on=['control', 'case', 'gene_symbol'])
-    df_['top_n'] = df_['top_n'].fillna(False)
-
     p = (
         ggplot() +
         geom_histogram(
-            df_.loc[df_['top_n']],
+            df_plot.loc[df_plot['top_n']],
             aes(x=measure),
             fill=orange,
             alpha=1.0,
             bins=50) +
         geom_histogram(
-            df_.loc[~df_['top_n']],
+            df_plot.loc[~df_plot['top_n']],
             aes(x=measure),
             fill=blue,
             alpha=0.5,
@@ -257,8 +287,30 @@ def plot_node_measure_distributions(nodes, measure, top_n=100):
     
     return p
 
-def plot_mean_log_fc_vs_centrality_measure(nodes, measure, top_n=100):
+def plot_mean_log_fc_vs_centrality_measure(networks, measure, top_n=100):
     """
+    """
+    dfs = []
+    
+    for (control, case), df in networks['nodes'].items():
+        
+        df_ = df.copy()
+        df_ = df_[['gene_symbol', measure, 'mean_log_fc']]
+        
+        df_top_n = df_.nlargest(top_n, measure)
+        df_top_n['top_n'] = True
+        df_top_n = df_top_n[['gene_symbol', 'top_n']]
+        
+        df_ = df_.merge(df_top_n, how='left', on='gene_symbol')
+        df_['top_n'] = df_['top_n'].fillna(False)
+        
+        df_['control'] = control
+        df_['case'] = case
+        
+        dfs.append(df_)
+        
+    df_plot = pd.concat(dfs)
+    
     """
     df_ = nodes.copy()
     df_ = df_.loc[:, ['control', 'case', 'gene_symbol', 'mean_log_fc', measure]]
@@ -272,9 +324,9 @@ def plot_mean_log_fc_vs_centrality_measure(nodes, measure, top_n=100):
     
     df_ = df_.merge(top_n_, how='left', on=['control', 'case', 'gene_symbol'])
     df_['top_n'] = df_['top_n'].fillna(False)
-    
+    """
     p = (
-        ggplot(df_) +
+        ggplot(df_plot) +
         geom_point(
             aes(x=measure,
                 y='mean_log_fc',
@@ -294,7 +346,7 @@ def plot_mean_log_fc_vs_centrality_measure(nodes, measure, top_n=100):
     
     return p
     
-def plot_log_fc_heatmap(merged_results, gene_set, control, case):    
+def plot_log_fc_heatmap(df, gene_set, control, case):    
     """
     """
     plt.style.use('ggplot')
@@ -306,13 +358,10 @@ def plot_log_fc_heatmap(merged_results, gene_set, control, case):
     plt.rcParams['grid.color']= '1.0'
     plt.rcParams.update({'font.size': 14})
     
-    df_ = merged_results.copy()
+    df_ = df.copy()
     df_ = (df_
-        .loc[((df_.control == control) & 
-              (df_.case == case) & 
-              (df_.gene_symbol.isin(gene_set)))]
-        .set_index('gene_symbol')
-        .drop(['control', 'case'], axis=1))
+        .loc[df_.gene_symbol.isin(gene_set)]
+        .set_index('gene_symbol'))
     
     gene_linkage = fastcluster.linkage(df_, method='ward', metric='euclidean')
     gene_order = hierarchy.leaves_list(gene_linkage)
@@ -325,6 +374,8 @@ def plot_log_fc_heatmap(merged_results, gene_set, control, case):
         label = 'ltbi-atb'
     elif (control == 'od') and (case == 'atb'):
         label = 'od-atb'
+    elif (control == 'hc') and (case == 'ltbi'):
+        label = 'hc-ltbi'
         
     width = 2.0
     
@@ -381,4 +432,75 @@ def plot_log_fc_heatmap(merged_results, gene_set, control, case):
     ax_cbar.set_xlabel(label, fontsize = 5, color = 'k')
 
     plt.show()
+
     
+def plot_stability_scores_lambda_path(stability_scores, method='max', threshold=0.5, title=''):
+    """
+    """
+    """
+    df = self._check_attribute(
+        '_feature_stability_scores_lambda_path',
+        'compute_feature_stability_scores')
+
+    stability_statistic = self._check_attribute(
+        '_feature_stability_scores_statistic',
+        'compute_feature_stability_scores')
+
+    if threshold is None:
+        threshold = 0.0
+
+    group = df.groupby('feature')
+
+    if method == 'max':
+        stability_scores = group['stability_score'].max()
+
+        is_stable = (
+            (stability_scores >= threshold)
+            .reset_index()
+            .rename({'stability_score': 'is_stable'}, axis=1))
+
+    elif method == 'auc':
+        stability_scores = group[['lambda', 'stability_score']].apply(
+            lambda x: auc(x['lambda'], x['stability_score']))
+
+        is_stable = (
+            (stability_scores >= threshold)
+            .reset_index()
+            .rename({0: 'is_stable'}, axis=1))
+
+    df = df.merge(is_stable, how='left', on='feature')
+    """
+    df_ = stability_scores['lambda_path'].copy().reset_index()
+    df_['lambda_neg_log10'] = -np.log10(df_['lambda'])
+
+    df_ = df_.merge(
+        stability_scores['scores'][['is_stable']],
+        how='inner', left_on='feature', right_index=True)
+
+    p = (
+        ggplot(df_) +
+        geom_line(
+            aes(x='lambda_neg_log10',
+                y='stability_score',
+                group='feature',
+                color='is_stable',
+                alpha='is_stable'),
+            linetype='dashed') +
+        scale_x_continuous(
+            breaks=np.arange(0, 5, 1)) +
+        scale_y_continuous(
+            breaks=np.arange(0, 1.1, 0.1)) +
+        scale_color_manual(
+            values=[lightgray, blue]) +
+        scale_alpha_manual(
+            values=[0.5, 1.0]) +
+        coord_cartesian(
+            ylim=[0, 1]) +
+        labs(
+            x='$-log_{10}(\lambda)$',
+            y='stability score',
+            title=title) +
+        theme_bw()
+    )
+
+    return p

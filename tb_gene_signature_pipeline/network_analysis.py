@@ -1,5 +1,6 @@
 
 import yaml
+import json
 import pickle
 import numpy as np
 import pandas as pd
@@ -11,10 +12,17 @@ from subprocess import check_call
 with (Path.cwd().resolve().parent / 'config.yml').open('r') as f:
     config = yaml.safe_load(f)
 
-this_dir = Path(__file__).parent.absolute()
+project_dir = Path.cwd().resolve().parent
+this_dir = project_dir / 'tb_gene_signature_pipeline'
 
-data_dir = Path(config['data_directory'])
-data_dir.mkdir(parents=True, exist_ok=True)
+output_dir = Path(config['output_directory'])
+output_dir.mkdir(parents=True, exist_ok=True)
+
+with (project_dir / 'data' / 'datasets.json').open('r') as f:
+    datasets = json.load(f)
+    
+with (project_dir / 'data' / 'comparisons.json').open('r') as f:
+    comparisons = json.load(f)
 
 def _edge_weight_computer(m):
     w = m @ m.T
@@ -27,7 +35,7 @@ def _edge_weight_computer(m):
         .rename({0: 'count'}, axis=1))
     df.index.name = 'edge_weight'
     
-    return df
+    return df.squeeze()
 
 def _permute_columns(m):
     idx_i = np.random.sample(m.shape).argsort(axis=0)
@@ -65,27 +73,33 @@ def compute_edge_weight_distributions(merged_results, overwrite=False):
     >>> edge_weight_distributions.head()
     
     """
-    edge_weights_file = data_dir / 'edge_weights.tsv'
+    edge_weights_file = output_dir / 'edge_weight.pkl'
     
     if any([not edge_weights_file.exists(), overwrite]):
-        df_ = merged_results.copy()
-        df_ = df_.set_index(['control', 'case', 'gene_symbol'])
-
-        df_[df_ < 0] = -1
-        df_[df_ == 0] = 0
-        df_[df_ > 0] = 1
-        df_ = df_.astype(int)
-
-        df_ = (df_
-            .groupby(level=['control', 'case'])
-            .apply(lambda x: _edge_weight_computer(x.values))
-            .reset_index())
+            
+        edge_weights_dict = {}
         
-        df_.to_csv(edge_weights_file, sep='\t', index=False)
+        for (control, case), df in merged_results.items():
+            
+            df_ = df.copy()
+            df_ = df_.set_index('gene_symbol')
+
+            df_[df_ < 0] = -1
+            df_[df_ == 0] = 0
+            df_[df_ > 0] = 1
+            df_ = df_.astype(int)
+            
+            edge_weights_dict[(control, case)] = _edge_weight_computer(df_.values)
+
+        with edge_weights_file.open('wb') as f:
+            pickle.dump(edge_weights_dict, f)
+            
+    else:
         
-    df_ = pd.read_table(edge_weights_file, sep='\t')
-    
-    return df_
+        with edge_weights_file.open('rb') as f:
+            edge_weights_dict = pickle.load(f)
+            
+    return edge_weights_dict
 
 def generate_null_edge_weight_distributions(merged_results, n_iter=1, overwrite=False):
     """
@@ -118,37 +132,46 @@ def generate_null_edge_weight_distributions(merged_results, n_iter=1, overwrite=
     ...     merged_results, n_iter=25)
     >>> null_distributions.head()
     """
-    null_distribution_file = data_dir / 'edge_weight_null_distributions.tsv'
+    null_distributions_file = output_dir / 'edge_weight_null_distributions.pkl'
     
-    if any([not null_distribution_file.exists(), overwrite]):
-        df_ = merged_results.copy()
-        df_ = df_.set_index(['control', 'case', 'gene_symbol'])
-
-        df_[df_ < 0] = -1
-        df_[df_ == 0] = 0
-        df_[df_ > 0] = 1
-        df_ = df_.astype(int)
-
-        df_ = (df_
-            .groupby(level=['control', 'case'])
-            .apply(lambda x: (pd
-                .concat([
-                    _edge_weight_computer(_permute_columns(x.values))
-                    for _ in range(n_iter)], axis=1)
+    if any([not null_distributions_file.exists(), overwrite]):
+        
+        null_distributions = {}
+        
+        for (control, case), df in merged_results.items():
+            df_ = df.set_index('gene_symbol')
+        
+            df_[df_ < 0] = -1
+            df_[df_ == 0] = 0
+            df_[df_ > 0] = 1
+            df_ = df_.astype(int)
+            
+            df_ = pd.concat([
+                pd.DataFrame(_edge_weight_computer(_permute_columns(df_.values)))
+                for _ in range(n_iter)], axis=1)
+            
+            srs = (df_
                 .fillna(0)
                 .sum(axis=1)
-                .astype(int)))
-            .reset_index()
-            .rename({0: 'count'}, axis=1))
+                .astype(int))
+            
+            srs.name = 'count'
+            
+            null_distributions[(control, case)] = srs
+            
+        with null_distributions_file.open('wb') as f:
+            pickle.dump(null_distributions, f)
+    
+    else:
         
-        df_.to_csv(null_distribution_file, sep='\t', index=False)
-    
-    df_ = pd.read_table(null_distribution_file, sep='\t')
-    
-    return df_
+        with null_distributions_file.open('rb') as f:
+            null_distributions = pickle.load(f)
+        
+    return null_distributions
          
 # notebook 1
-def run_differential_expression_analysis(overwrite=False, log_transform_all_geo_data=False):
+def run_differential_expression_analysis(overwrite=False, log_transform_all_geo_data=False,
+                                         quantile_normalize_per_class=False, salmon_or_rsem='salmon'):
     """
     Run marginal, per-gene differential expression analyses.
     
@@ -159,23 +182,23 @@ def run_differential_expression_analysis(overwrite=False, log_transform_all_geo_
     each dataset defined in ``data/datasets.json``, and for each group comparison
     defined in ``data/comparisons.json``.
     
-    Below, `<data_dir>` refers to the path specified by the `data_directory` in the
+    Below, `<output_dir>` refers to the path specified by the `output_directory` in the
     project config file (`confi.yml`).
     
     All transformed expression values for each dataset are written to files
-    `<data_dir>/transformed-expression-matrices/<gse_id>.<dataset_platform>.transformed_expr_matrix.tsv`.
+    `<output_dir>/transformed-expression-matrices/<gse_id>.<dataset_platform>.transformed_expr_matrix.tsv`.
     
     All normalized expression values for each dataset are written to files
-    `<data_dir>/normalized-expression-matrices/<gse_id>.<dataset_platform>.normalized_expr_matrix.tsv`.
+    `<output_dir>/normalized-expression-matrices/<gse_id>.<dataset_platform>.normalized_expr_matrix.tsv`.
     
     Combined transformed and expression values for all datasets are written to a single file
-    `<data_dir>/differential_expression_values.tsv`.
+    `<output_dir>/differential_expression_values.tsv`.
     
     All differential expression results for each dataset are written to files
-    `<data_dir>/differential-expression-results/<gse_id>.<control>_vs_<case>.diff_expr_results.tsv`.
+    `<output_dir>/differential-expression-results/<gse_id>.<control>_vs_<case>.diff_expr_results.tsv`.
     
     Combined differential expression results for all datasets are written to a single file
-    `<data_dir>/differential_expression_results.tsv`.
+    `<output_dir>/differential_expression_results.tsv`.
     
     Parameters
     ----------
@@ -186,6 +209,13 @@ def run_differential_expression_analysis(overwrite=False, log_transform_all_geo_
         If `True`, log-transform all microarray data downloaded from GEO,
         regardless of whether or not it's already been transformed. If `False`,
         only log-transform dataset if it is not already log-transformed.
+    quantile_normalize_per_class : bool
+        If `True`, quantile-normalize each log-transformed microarray dataset
+        separately within each phenotype class. If `False`, quantile-normalize all
+        samples together.
+    salmon_or_rsem : str
+        One of ``{'salmon', 'rsem'}``. Specifies which processed bulk RNA-seq expression
+        matrices to use in differential expression analysis.
     
     Returns
     -------
@@ -230,26 +260,23 @@ def run_differential_expression_analysis(overwrite=False, log_transform_all_geo_
     3  GSE19439      hc  atb       A2ML1 -0.171059   0.204401
     4  GSE19439      hc  atb     A3GALT2 -0.008727   0.967318
     """
-    transformed_data_dir = data_dir / 'transformed-expression-matrices'
+    transformed_data_dir = output_dir / 'transformed-expression-matrices'
     transformed_data_dir.mkdir(parents=True, exist_ok=True)
 
-    normalized_data_dir = data_dir / 'normalized-expression-matrices'
+    normalized_data_dir = output_dir / 'normalized-expression-matrices'
     normalized_data_dir.mkdir(parents=True, exist_ok=True)
 
-    diff_exp_results_dir = data_dir / 'differential-expression-results'
+    diff_exp_results_dir = output_dir / 'differential-expression-results'
     diff_exp_results_dir.mkdir(parents=True, exist_ok=True)
     
-    exprs_file = data_dir / 'differential_expression_values.tsv'
-    results_file = data_dir / 'differential_expression_results.tsv'
-
-    if log_transform_all_geo_data:
-        log_transform = 'true'
-    else:
-        log_transform = 'false'
+    exprs_file = output_dir / 'differential_expression_values.tsv'
+    results_file = output_dir / 'differential_expression_results.tsv'
     
     if any([not exprs_file.exists(), not results_file.exists(), overwrite]):
         r_script = this_dir / 'R' / 'differential_expression_analysis.R'
-        check_call([r_script, log_transform])
+        check_call([
+            r_script, str(log_transform_all_geo_data),
+            str(quantile_normalize_per_class), salmon_or_rsem])
 
     df_exprs = pd.read_table(exprs_file, sep='\t')
     df_results = pd.read_table(results_file, sep='\t')
@@ -310,6 +337,25 @@ def merge_differential_expression_results(
         axis=1)
     df['log_fc'] = df.apply(lambda x: x['log_fc'] if x['is_sig'] else 0.0, axis=1)
     
+    dfs = {}
+    
+    for comparison in comparisons:
+        
+        control = comparison['control']
+        case = comparison['case']
+        
+        df_ = (df
+            .loc[
+                (df['control'] == control) &
+                (df['case'] == case)]
+            .pivot(
+                index='gene_symbol', columns='dataset', values='log_fc')
+            .fillna(0.)
+            .reset_index())
+        
+        dfs[(control, case)] = df_
+    
+    """
     df = (df
         .groupby(['control', 'case'])
         .apply(
@@ -317,8 +363,9 @@ def merge_differential_expression_results(
                 index='gene_symbol', columns='dataset', values='log_fc'))
         .fillna(0.)
         .reset_index())
+    """
     
-    return df
+    return dfs
 
 # notebook 5
 def construct_networks(merged_results, overwrite=False):
@@ -335,15 +382,15 @@ def construct_networks(merged_results, overwrite=False):
     **at least 3** datasets.
     
     Pickled network graphs for each comparison network are written to
-    `<data_dir>/network_graphs.pkl`.
+    `<output_dir>/network_graphs.pkl`.
     
     Measures for each node in all comparison networks are written to a single
-    file `<data_dir>/network_nodes.tsv`.
+    file `<output_dir>/network_nodes.tsv`.
     
     Parameters
     ----------
-    merged_results : :class:`pd.DataFrame`
-        A gene-by-dataset dataframe of significant log fold change
+    merged_results : dict of :class:`pd.DataFrame`
+        A dictionary of gene-by-dataset dataframes of significant log fold change
         effect sizes, as produced by :func:`merge_differential_expression_results`.
     overwrite : bool
         If output files already exist and ``overwrite`` is `False`, read
@@ -396,17 +443,15 @@ def construct_networks(merged_results, overwrite=False):
     3413      od  atb        NRG1       4         1.333333            1.917126e-11
     
     """
-    graph_file = data_dir / 'network_graphs.pkl'
-    nodes_file = data_dir / 'network_nodes.tsv'
+    networks_file = output_dir / 'networks.pkl'
     
-    if any([not graph_file.exists(), not nodes_file.exists(), overwrite]):
-    
-        df_ = merged_results.copy()
+    if any([not networks_file.exists(), overwrite]):
 
         def generate_network_per_comparison(xdf):
             xdf_ = xdf.copy().reset_index()
 
-            m = xdf_.drop(['control', 'case', 'gene_symbol'], axis=1).values
+            #m = xdf_.drop(['control', 'case', 'gene_symbol'], axis=1).values
+            m = xdf_.drop('gene_symbol', axis=1).values
             n_datasets = (m.sum(axis=0) > 0).sum()
 
             m[m > 0] = 1
@@ -427,75 +472,61 @@ def construct_networks(merged_results, overwrite=False):
             graph.add_weighted_edges_from(network_edge_list)
 
             return graph
-
-        graphs = (df_
-            .groupby(['control', 'case'])
-            .apply(generate_network_per_comparison)
-            .reset_index()
-            .rename({0: 'graph'}, axis=1))
-
-        def compute_degrees(graphs, weight=None):
-            colname = 'weighted_degree' if weight == 'weight' else 'degree'
-            df_degrees = (graphs
-                .set_index(['control', 'case'])
-                .apply(lambda x: (pd
-                    .DataFrame(
-                        x['graph'].degree(weight=weight))
-                    .to_records(index=False)), axis=1)
+        
+        graphs = {}
+        nodes = {}
+        
+        for comparison, df in merged_results.items():
+            control = comparison[0]
+            case = comparison[1]
+            
+            graph = generate_network_per_comparison(df)
+            
+            degrees = (pd
+                .DataFrame(graph.degree(weight=None))
+                .rename({0: 'gene_symbol', 1: 'degree'}, axis=1))
+            
+            eigens = (pd
+                .DataFrame([
+                    (k, v) for k, v in 
+                    nx.eigenvector_centrality(graph, weight='weight').items()])
+                .rename({0: 'gene_symbol', 1: 'eigenvector_centrality'}, axis=1))
+            
+            weighted_degrees = (pd
+                .DataFrame(graph.degree(weight='weight'))
+                .rename({0: 'gene_symbol', 1: 'weighted_degree'}, axis=1))
+            
+            mean_log_fc = (df
+                .copy()
+                .set_index('gene_symbol')
+                .mean(axis=1)
                 .reset_index()
-                .explode(0)
-                .reset_index(drop=True))
-            df_degrees['gene_symbol'] = df_degrees[0].apply(lambda x: x[0])
-            df_degrees[colname] = df_degrees[0].apply(lambda x: x[1])
-            df_degrees = df_degrees[['control', 'case', 'gene_symbol', colname]]
-
-            return df_degrees
-
-        df_degrees = compute_degrees(graphs, weight=None)
-        df_weighted = compute_degrees(graphs, weight='weight')
-
-        df_eigens = (graphs
-            .set_index(['control', 'case'])
-            .apply(lambda x: [
-                (k, v) for k, v in nx.eigenvector_centrality(
-                    x['graph'], weight='weight').items()],
-                axis=1)
-            .reset_index()
-            .explode(0)
-            .reset_index(drop=True))
-        df_eigens['gene_symbol'] = df_eigens[0].apply(lambda x: x[0])
-        df_eigens['eigenvector_centrality'] = df_eigens[0].apply(lambda x: x[1])
-        df_eigens = df_eigens[['control', 'case', 'gene_symbol', 'eigenvector_centrality']]
-
-        df_nodes = (df_degrees
-            .merge(
-                df_weighted, on=['control', 'case', 'gene_symbol'])
-            .merge(
-                df_eigens, on=['control', 'case', 'gene_symbol']))
-        
-        df_nodes['mean_log_fc'] = (df_nodes
-            .merge(df_, how='inner',
-                   on=['control', 'case', 'gene_symbol'])
-            .drop(['control', 'case', 'gene_symbol', 'degree',
-                   'weighted_degree', 'eigenvector_centrality'], axis=1)
-            .mean(axis=1))
-        
-        with graph_file.open('wb') as f:
-            pickle.dump(graphs, f)
+                .rename({0: 'mean_log_fc'}, axis=1))
             
-        df_nodes.to_csv(nodes_file, sep='\t', index=False)
-            
-    with graph_file.open('rb') as f:
-        graphs = pickle.load(f)
-        
-    df_nodes = pd.read_table(nodes_file, sep='\t')
-    
-    return {
-        'graphs': graphs,
-        'nodes': df_nodes
-    }
+            df_nodes = (degrees
+                .merge(eigens, how='inner', on='gene_symbol')
+                .merge(weighted_degrees, how='inner', on='gene_symbol')
+                .merge(mean_log_fc, how='inner', on='gene_symbol'))
 
-def generate_gene_lists(nodes, top_n=100):
+            graphs[(control, case)] = graph
+            nodes[(control, case)] = df_nodes
+            
+        networks = {
+            'graphs': graphs,
+            'nodes': nodes
+        }
+        
+        with networks_file.open('wb') as f:
+            pickle.dump(networks, f)
+            
+    else:
+        
+        with networks_file.open('rb') as f:
+            networks = pickle.load(f)
+            
+    return networks
+        
+def generate_gene_lists(networks, top_n=100):
     """
     Generate gene lists for each comparison by returning the
     top nodes in each comparison network by ``weighted_degree``.
@@ -525,21 +556,13 @@ def generate_gene_lists(nodes, top_n=100):
     >>> gene_lists = tb.generate_gene_lists(networks['nodes'], top_n=100)
         
     """
-    df_ = nodes.copy()
+    top_nodes_dict = {}
     
-    top_nodes = (df_
-        .groupby(['control', 'case'])
-        .apply(lambda x: x.nlargest(top_n, 'weighted_degree')))['gene_symbol']
-
-    top_nodes = (top_nodes
-        .droplevel(2)
-        .groupby(['control', 'case'])
-        .apply(list)
-        .to_dict())
-    
-    top_nodes = {f'{k[0]}-{k[1]}': v for k, v in top_nodes.items()}
-    
-    return top_nodes
+    for (control, case), df in networks['nodes'].items():
+        top_nodes = df.nlargest(top_n, 'weighted_degree')['gene_symbol']
+        top_nodes_dict[(control, case)] = list(top_nodes)
+        
+    return top_nodes_dict
     
 # notebook 6
 def combine_networks_into_lists(networks, n_nodes=100):
